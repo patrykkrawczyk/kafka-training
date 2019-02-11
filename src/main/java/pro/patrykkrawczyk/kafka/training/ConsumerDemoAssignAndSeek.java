@@ -1,4 +1,4 @@
-package pro.patrykkrawczyk.kafka_training;
+package pro.patrykkrawczyk.kafka.training;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

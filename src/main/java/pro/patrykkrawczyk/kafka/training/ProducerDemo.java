@@ -1,4 +1,4 @@
-package pro.patrykkrawczyk.kafka_training;
+package pro.patrykkrawczyk.kafka.training;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;

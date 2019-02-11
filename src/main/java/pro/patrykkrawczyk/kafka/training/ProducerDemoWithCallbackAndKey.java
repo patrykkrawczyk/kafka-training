@@ -1,4 +1,4 @@
-package pro.patrykkrawczyk.kafka_training;
+package pro.patrykkrawczyk.kafka.training;
 
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -12,9 +12,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
-public class ProducerDemoWithCallback {
+public class ProducerDemoWithCallbackAndKey {
 
-    private static final Logger logger = LoggerFactory.getLogger(ProducerDemoWithCallback.class);
+    private static final Logger logger = LoggerFactory.getLogger(ProducerDemoWithCallbackAndKey.class);
 
     private static final String SERVER_ADDRESS = "192.168.0.158:9092";
 
@@ -29,8 +29,11 @@ public class ProducerDemoWithCallback {
         String topic = "test-topic";
 
         for (int i = 0; i < 10; ++i) {
+            String key = "id_" + i;
             String value = "message_" + i;
-            ProducerRecord<String, String> record = new ProducerRecord<>(topic, value);
+            ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, value);
+
+            logger.info("Key: " + key);
 
             producer.send(record, new Callback() {
                 @Override
@@ -46,7 +49,7 @@ public class ProducerDemoWithCallback {
 
                     System.out.println(msg);
                 }
-            });
+            }).get(); // Temporary, only to see key working, dont use at production!
         }
 
         producer.close();
