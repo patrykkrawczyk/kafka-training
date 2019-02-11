@@ -10,10 +10,17 @@ import com.twitter.hbc.core.endpoint.StatusesFilterEndpoint;
 import com.twitter.hbc.core.processor.StringDelimitedProcessor;
 import com.twitter.hbc.httpclient.auth.Authentication;
 import com.twitter.hbc.httpclient.auth.OAuth1;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -21,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 public class TwitterProducer {
 
     private static final Logger logger = LoggerFactory.getLogger(TwitterProducer.class);
+    private static final String SERVER_ADDRESS = "192.168.0.158:9092";
 
     public static void main(String[] args) throws InterruptedException {
         TwitterProducer twitterProducer = new TwitterProducer();
@@ -30,12 +38,32 @@ public class TwitterProducer {
 
         client.connect();
 
-        // on a different thread, or multiple different threads....
+        KafkaProducer<String, String> producer = twitterProducer.createKafkaProducer();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logger.info("Shutting down");
+            client.stop();
+            producer.close();
+        }));
+
         while (!client.isDone()) {
             String msg = msgQueue.poll(5, TimeUnit.SECONDS);
 
             if (msg != null) {
                 logger.info(msg);
+
+                String topic = "twitter-tweets";
+                String key = null;
+                String value = msg;
+
+                producer.send(new ProducerRecord<>(topic, key, value), new Callback() {
+                    @Override
+                    public void onCompletion(RecordMetadata metadata, Exception e) {
+                        if (e != null) {
+                            logger.error("Something bad happened", e);
+                        }
+                    }
+                });
             }
         }
     }
@@ -61,5 +89,14 @@ public class TwitterProducer {
                 .processor(new StringDelimitedProcessor(msgQueue));
 
         return builder.build();
+    }
+
+    public KafkaProducer<String, String> createKafkaProducer() {
+        Properties properties = new Properties();
+        properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, SERVER_ADDRESS);
+        properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+
+        return new KafkaProducer<>(properties);
     }
 }
