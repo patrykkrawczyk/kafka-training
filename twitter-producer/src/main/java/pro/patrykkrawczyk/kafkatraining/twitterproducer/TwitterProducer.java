@@ -1,4 +1,4 @@
-package pro.patrykkrawczyk.kafka.twitter_app;
+package pro.patrykkrawczyk.kafkatraining.twitterproducer;
 
 import com.google.common.collect.Lists;
 import com.twitter.hbc.ClientBuilder;
