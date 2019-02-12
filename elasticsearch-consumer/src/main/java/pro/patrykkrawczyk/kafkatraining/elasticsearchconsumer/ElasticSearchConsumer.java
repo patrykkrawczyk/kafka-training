@@ -1,5 +1,6 @@
 package pro.patrykkrawczyk.kafkatraining.elasticsearchconsumer;
 
+import com.google.gson.JsonParser;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -31,6 +32,7 @@ import java.util.Properties;
 public class ElasticSearchConsumer {
 
     private static final Logger logger = LoggerFactory.getLogger(ElasticSearchConsumer.class);
+    private static final JsonParser jsonParser = new JsonParser();
 
     public static void main(String[] args) throws IOException {
         RestHighLevelClient client = createClient();
@@ -40,13 +42,13 @@ public class ElasticSearchConsumer {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
 
             for (ConsumerRecord<String, String> r : records) {
-                IndexRequest indexRequest = new IndexRequest("twitter", "tweets")
+                String id = extractIdFromTweet(r.value());
+                IndexRequest indexRequest = new IndexRequest("twitter", "tweets", id)
                         .source(r.value(), XContentType.JSON);
 
                 IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
 
-                String id = indexResponse.getId();
-                logger.info(id);
+                logger.info(indexResponse.getId());
             }
         }
 
@@ -80,5 +82,12 @@ public class ElasticSearchConsumer {
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
         consumer.subscribe(Collections.singleton(topic));
         return consumer;
+    }
+
+    private static String extractIdFromTweet(String json) {
+        return jsonParser.parse(json)
+                .getAsJsonObject()
+                .get("id_str")
+                .getAsString();
     }
 }
