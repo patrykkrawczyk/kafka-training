@@ -14,6 +14,8 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -41,14 +43,27 @@ public class ElasticSearchConsumer {
         while (true) {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
 
+            BulkRequest bulkRequest = new BulkRequest();
+
+            int recordCount = records.count();
+            logger.info("Received " + recordCount + " records");
             for (ConsumerRecord<String, String> r : records) {
-                String id = extractIdFromTweet(r.value());
-                IndexRequest indexRequest = new IndexRequest("twitter", "tweets", id)
-                        .source(r.value(), XContentType.JSON);
+                try {
+                    String id = extractIdFromTweet(r.value());
+                    IndexRequest indexRequest = new IndexRequest("twitter", "tweets", id)
+                            .source(r.value(), XContentType.JSON);
 
-                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+                    bulkRequest.add(indexRequest);
+                } catch (Exception e) {
+                    logger.info("skipping bad data: " + r.value());
+                }
+            }
 
-                logger.info(indexResponse.getId());
+            if (recordCount > 0) {
+                BulkResponse bulk = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+                logger.info("Syncing offsets...");
+                consumer.commitSync();
+                logger.info("Offsets have been committed");
             }
         }
 
@@ -78,6 +93,8 @@ public class ElasticSearchConsumer {
         properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, "kafka-demo-elasticsearch");
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
         consumer.subscribe(Collections.singleton(topic));
